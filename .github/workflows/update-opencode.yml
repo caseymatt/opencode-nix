@@ -80,12 +80,12 @@ jobs:
             platform="${platforms[$system]}"
             echo "  📦 Fetching hash for $platform..."
             
-            # Fetch the hash using nix-prefetch-url
-            hash=$(nix-prefetch-url "https://registry.npmjs.org/$platform/-/$platform-$NEW_VERSION.tgz" 2>/dev/null)
+            # Fetch the hash using nix-prefetch-url (returns base32 format)
+            base32_hash=$(nix-prefetch-url "https://registry.npmjs.org/$platform/-/$platform-$NEW_VERSION.tgz" 2>/dev/null)
             
-            if [ $? -eq 0 ] && [ ! -z "$hash" ]; then
-              # Convert to SRI format (sha256-...)
-              sri_hash=$(nix hash convert --hash-algo sha256 --to sri "$hash")
+            if [ $? -eq 0 ] && [ ! -z "$base32_hash" ]; then
+              # Convert base32 to SRI format using nix-hash (available in older Nix versions)
+              sri_hash=$(nix-hash --type sha256 --to-base64 "$base32_hash" | sed 's/^/sha256-/')
               
               # Update the hash in package.nix for this platform (only in platformHashes section)
               sed -i "/platformHashes = {/,/};/s/\"$system\" = \"sha256-[^\"]*\"/\"$system\" = \"$sri_hash\"/" package.nix
