@@ -1,0 +1,28 @@
+# Nix build results
+result
+result-*
+
+# Nix development shells
+.direnv/
+.envrc
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Cache directories
+.cache/

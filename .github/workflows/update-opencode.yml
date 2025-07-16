@@ -1,0 +1,176 @@
+name: Update OpenCode Version
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Check for new OpenCode version
+        id: check
+        run: |
+          # Get current version from package.nix
+          CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' package.nix)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Get latest version from npm
+          LATEST_VERSION=$(npm view opencode-ai version)
+          echo "Latest version: $LATEST_VERSION"
+          
+          # Set outputs
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if update is needed
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "✅ Update needed: $CURRENT_VERSION → $LATEST_VERSION"
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "✅ Already up to date: $CURRENT_VERSION"
+          fi
+      
+      - name: Install Nix
+        if: steps.check.outputs.update_needed == 'true'
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Update version and fetch all platform hashes
+        if: steps.check.outputs.update_needed == 'true'
+        run: |
+          NEW_VERSION="${{ steps.check.outputs.latest }}"
+          echo "🔄 Updating to version $NEW_VERSION..."
+          
+          # Update version in package.nix
+          sed -i "s/version = \".*\"/version = \"$NEW_VERSION\"/" package.nix
+          echo "✅ Updated version in package.nix"
+          
+          # Fetch hashes for all platforms
+          declare -A platforms=(
+            ["x86_64-linux"]="opencode-linux-x64"
+            ["aarch64-linux"]="opencode-linux-arm64"
+            ["x86_64-darwin"]="opencode-darwin-x64"
+            ["aarch64-darwin"]="opencode-darwin-arm64"
+            ["x86_64-windows"]="opencode-windows-x64"
+          )
+          
+          echo "🔄 Fetching hashes for all platforms..."
+          for system in "${!platforms[@]}"; do
+            platform="${platforms[$system]}"
+            echo "  📦 Fetching hash for $platform..."
+            
+            # Fetch the hash using nix-prefetch-url
+            hash=$(nix-prefetch-url "https://registry.npmjs.org/$platform/-/$platform-$NEW_VERSION.tgz" 2>/dev/null)
+            
+            if [ $? -eq 0 ] && [ ! -z "$hash" ]; then
+              # Convert to SRI format (sha256-...)
+              sri_hash=$(nix hash convert --hash-algo sha256 --to sri "$hash")
+              
+              # Update the hash in package.nix for this platform (only in platformHashes section)
+              sed -i "/platformHashes = {/,/};/s/\"$system\" = \"sha256-[^\"]*\"/\"$system\" = \"$sri_hash\"/" package.nix
+              echo "    ✅ Updated $system: $sri_hash"
+            else
+              echo "    ❌ Failed to fetch hash for $platform"
+              exit 1
+            fi
+          done
+          
+          echo "✅ All platform hashes updated successfully"
+
+      - name: Update flake.lock
+        if: steps.check.outputs.update_needed == 'true'
+        run: |
+          # Update flake.lock
+          nix flake update --extra-experimental-features 'nix-command flakes'
+        
+      - name: Create Pull Request
+        if: steps.check.outputs.update_needed == 'true'
+        id: create-pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update OpenCode to ${{ steps.check.outputs.latest }}"
+          title: "chore: update OpenCode to ${{ steps.check.outputs.latest }}"
+          body: |
+            ## 🤖 Automated OpenCode Update
+            
+            Updates OpenCode from `${{ steps.check.outputs.current }}` to `${{ steps.check.outputs.latest }}`.
+            
+            ### 📋 Changes
+            - ✅ Updated `version` in `package.nix`
+            - ✅ Updated SHA256 hashes for all supported platforms
+            - ✅ Updated `flake.lock` with new derivation hash
+            
+            ### 🏗️ Platform Hashes Updated
+            - ✅ `x86_64-linux` (opencode-linux-x64)
+            - ✅ `aarch64-linux` (opencode-linux-arm64)  
+            - ✅ `x86_64-darwin` (opencode-darwin-x64)
+            - ✅ `aarch64-darwin` (opencode-darwin-arm64)
+            - ✅ `x86_64-windows` (opencode-windows-x64)
+            
+            ### 🧪 Verification Checklist
+            - [ ] Version number is correctly updated in `package.nix`
+            - [ ] All platform hashes have been updated
+            - [ ] `flake.lock` has been updated
+            - [ ] The new version builds successfully
+            - [ ] Basic OpenCode functionality works as expected
+            
+            ---
+            
+            To test this update locally:
+            ```bash
+            nix build .#opencode
+            ./result/bin/opencode --version
+            ```
+            
+            🤖 This PR was automatically generated by the update workflow.
+          branch: update-opencode-${{ steps.check.outputs.latest }}
+          delete-branch: true
+          labels: |
+            dependencies
+            automated
+      
+      - name: Enable Auto-Merge
+        if: steps.check.outputs.update_needed == 'true' && steps.create-pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash --delete-branch
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version:** ${{ steps.check.outputs.current }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest Version:** ${{ steps.check.outputs.latest }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Update Needed:** ${{ steps.check.outputs.update_needed }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check.outputs.update_needed }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Pull request created for version update!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Already up to date!" >> $GITHUB_STEP_SUMMARY
+          fi

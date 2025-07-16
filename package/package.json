@@ -1,0 +1,17 @@
+{
+  "name": "opencode-ai",
+  "bin": {
+    "opencode": "./bin/opencode"
+  },
+  "scripts": {
+    "postinstall": "node ./postinstall.mjs"
+  },
+  "version": "0.3.11",
+  "optionalDependencies": {
+    "opencode-linux-arm64": "0.3.11",
+    "opencode-linux-x64": "0.3.11",
+    "opencode-darwin-x64": "0.3.11",
+    "opencode-darwin-arm64": "0.3.11",
+    "opencode-windows-x64": "0.3.11"
+  }
+}

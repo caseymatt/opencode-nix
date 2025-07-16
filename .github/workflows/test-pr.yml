@@ -1,0 +1,85 @@
+name: Test Pull Request
+
+on:
+  pull_request:
+    paths:
+      - 'package.nix'
+      - 'flake.nix'
+      - 'flake.lock'
+
+jobs:
+  test-build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            system: x86_64-linux
+          - os: macos-latest
+            system: aarch64-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Nix cache
+        uses: cachix/cachix-action@v14
+        with:
+          name: opencode-nix
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Build package
+        run: |
+          nix build .#opencode --print-build-logs
+          
+      - name: Test opencode version
+        run: |
+          # Test that opencode runs and reports version
+          ./result/bin/opencode --version
+          
+      - name: Verify package contents
+        run: |
+          # Verify the binary exists
+          test -f ./result/bin/opencode
+          
+          # Verify the actual binary exists
+          test -f ./result/bin/opencode-bin
+          
+          # Verify wrapper script is executable
+          test -x ./result/bin/opencode
+          
+      - name: Test wrapper functionality
+        run: |
+          # Test help command (may exit with non-zero, that's ok)
+          ./result/bin/opencode --help || true
+          
+          # Verify it reports correct version
+          version_output=$(./result/bin/opencode --version)
+          echo "Version output: $version_output"
+          
+          # Check that version matches expected format (semver)
+          echo "$version_output" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || {
+            echo "Error: Version output doesn't match expected format"
+            exit 1
+          }
+
+      - name: Test macOS permission paths
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Test stable binary path creation (macOS-specific)
+          mkdir -p ~/.local/bin
+          ln -sf "$(pwd)/result/bin/opencode" ~/.local/bin/opencode
+          ~/.local/bin/opencode --version
+          
+          # Verify the symlink was created correctly
+          test -L ~/.local/bin/opencode
+          test -x ~/.local/bin/opencode
