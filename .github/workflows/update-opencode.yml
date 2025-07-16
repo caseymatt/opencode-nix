@@ -88,7 +88,7 @@ jobs:
               sri_hash=$(nix-hash --type sha256 --to-base64 "$base32_hash" | sed 's/^/sha256-/')
               
               # Update the hash in package.nix for this platform (only in platformHashes section)
-              sed -i "/platformHashes = {/,/};/s/\"$system\" = \"sha256-[^\"]*\"/\"$system\" = \"$sri_hash\"/" package.nix
+              sed -i '/platformHashes = {/,/};/s@"'"$system"'" = "sha256-[^"]*"@"'"$system"'" = "'"$sri_hash"'"@' package.nix
               echo "    ✅ Updated $system: $sri_hash"
             else
               echo "    ❌ Failed to fetch hash for $platform"
