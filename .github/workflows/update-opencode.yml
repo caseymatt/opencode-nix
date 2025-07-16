@@ -87,8 +87,16 @@ jobs:
               # Convert base32 to SRI format using nix-hash (available in older Nix versions)
               sri_hash=$(nix-hash --type sha256 --to-base64 "$base32_hash" | sed 's/^/sha256-/')
               
-              # Update the hash in package.nix for this platform (only in platformHashes section)
-              sed -i '/platformHashes = {/,/};/s@"'"$system"'" = "sha256-[^"]*"@"'"$system"'" = "'"$sri_hash"'"@' package.nix
+              # Update the hash in package.nix for this platform
+              # Use awk instead of sed to avoid delimiter conflicts with SRI hash format
+              awk -v target="$system" -v new_hash="$sri_hash" '
+              {
+                  if ($0 ~ "\"" target "\" = \"sha256-") {
+                      gsub(/sha256-[^"]*/, new_hash)
+                  }
+                  print
+              }
+              ' package.nix > package.nix.tmp && mv package.nix.tmp package.nix
               echo "    ✅ Updated $system: $sri_hash"
             else
               echo "    ❌ Failed to fetch hash for $platform"
