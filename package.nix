@@ -82,6 +82,25 @@ export OPENCODE_EXECUTABLE_PATH="$HOME/.local/bin/opencode"
 # Disable automatic update checks since updates should go through Nix
 export DISABLE_AUTOUPDATER=1
 
+# Create stable symlink for macOS permission persistence
+# This ensures the same path is always used, preventing permission resets
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  mkdir -p "$HOME/.local/bin"
+  
+  # Check if Home Manager is managing this environment
+  if [[ -n "$__HM_SESS_VARS_SOURCED" ]] || \
+     [[ -f "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]] || \
+     [[ -f "/etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh" ]]; then
+    # Home Manager detected - let it manage symlinks declaratively
+    : # no-op
+  else
+    # No Home Manager - provide convenience auto-creation
+    if [[ ! -e "$HOME/.local/bin/opencode" ]]; then
+      ln -sf "$out/bin/opencode" "$HOME/.local/bin/opencode"
+    fi
+  fi
+fi
+
 # Execute the actual binary with all arguments
 exec "$out/bin/opencode-bin" "$@"
 EOF
