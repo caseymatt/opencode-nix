@@ -4,11 +4,11 @@ let
   # Platform detection and corresponding hashes
   # These hashes are automatically updated by GitHub Actions
   platformHashes = {
-    "x86_64-linux" = "sha256-zWbrJyV+uhVnYmRgyAWJmEGIeGZgzlkIuyOZoDmNEUw=";
-    "aarch64-linux" = "sha256-k6q4XJOjuMj9RGcy76rd2wP8rGrJEBzmdzagTQnHNrE=";
-    "x86_64-darwin" = "sha256-mU3JiXqQATC8I9dvynYKg2MbzzIb5UDCwT8auoskzvM=";
-    "aarch64-darwin" = "sha256-Oip4GvrYLFbETv2SraD/YOJWvynUxlvt7zqpRLHJ78g=";
-    "x86_64-windows" = "sha256-HCq+E9la5TaDAhQ9ELEaZCbc861VTZKo/ItNXGxxwKU=";
+    "x86_64-linux" = "sha256-NyXnHiQNtoUpRpGXkn2jrqRE2kHWKLx+5XNG/jk0GM8=";
+    "aarch64-linux" = "sha256-8Xft/MjVNGnunL8cR9nspCgHUPPbrk+HJYiPdcnZXE0=";
+    "x86_64-darwin" = "sha256-TaRUELcdAU9LcFRdYlW8NDRU8eCs0A270TT4D9kN/KE=";
+    "aarch64-darwin" = "sha256-JaZyVRH9DtUayM1iZxSiAOGZF6pAOi0PZ3JguZ/I884=";
+    "x86_64-windows" = "sha256-U4TiAbu/V0cXJXEDyTchvNERZ1GsNLtLhAkVDLEGBqA=";
   };
 
   platformNames = {
@@ -25,7 +25,7 @@ in
 
 stdenv.mkDerivation rec {
   pname = "opencode";
-  version = "0.3.86";  # Update this to install a newer version
+  version = "0.3.107";  # Update this to install a newer version
 
   # Download platform-specific binary directly
   src = fetchurl {
