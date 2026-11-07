@@ -25,13 +25,18 @@ jobs:
       
       - name: Check for new OpenCode version
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Get current version from package.nix
           CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' package.nix)
           echo "Current version: $CURRENT_VERSION"
           
-          # Get latest version from npm
-          LATEST_VERSION=$(npm view opencode-ai version)
+          # Get the highest stable release from GitHub. OpenCode 2.x is not
+          # published to npm, and upstream still marks a 1.x release as
+          # "latest", so pick the highest vX.Y.Z tag instead.
+          LATEST_VERSION=$(gh release list -R anomalyco/opencode --exclude-pre-releases --exclude-drafts -L 50 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -1)
           echo "Latest version: $LATEST_VERSION"
           
           # Set outputs
@@ -68,11 +73,11 @@ jobs:
           
           # Fetch hashes for all platforms
           declare -A platforms=(
-            ["x86_64-linux"]="opencode-linux-x64"
-            ["aarch64-linux"]="opencode-linux-arm64"
-            ["x86_64-darwin"]="opencode-darwin-x64"
-            ["aarch64-darwin"]="opencode-darwin-arm64"
-            ["x86_64-windows"]="opencode-windows-x64"
+            ["x86_64-linux"]="opencode-linux-x64.tar.gz"
+            ["aarch64-linux"]="opencode-linux-arm64.tar.gz"
+            ["x86_64-darwin"]="opencode-darwin-x64.zip"
+            ["aarch64-darwin"]="opencode-darwin-arm64.zip"
+            ["x86_64-windows"]="opencode-windows-x64.zip"
           )
           
           echo "🔄 Fetching hashes for all platforms..."
@@ -81,7 +86,7 @@ jobs:
             echo "  📦 Fetching hash for $platform..."
             
             # Fetch the hash using nix-prefetch-url (returns base32 format)
-            base32_hash=$(nix-prefetch-url "https://registry.npmjs.org/$platform/-/$platform-$NEW_VERSION.tgz" 2>/dev/null)
+            base32_hash=$(nix-prefetch-url "https://github.com/anomalyco/opencode/releases/download/v$NEW_VERSION/$platform" 2>/dev/null)
             
             if [ $? -eq 0 ] && [ ! -z "$base32_hash" ]; then
               # Convert base32 to SRI format using nix-hash (available in older Nix versions)
