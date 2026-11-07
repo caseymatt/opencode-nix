@@ -1,35 +1,36 @@
-{ lib, stdenv, fetchurl, cacert, bash, system }:
+{ lib, stdenv, fetchurl, cacert, bash, unzip, system }:
 
 let
   # Platform detection and corresponding hashes
   # These hashes are automatically updated by GitHub Actions
   platformHashes = {
-    "x86_64-linux" = "sha256-LXz8MD3sxsu82yL/G+JYsDziterldYNUWvyPEsAd1eA=";
-    "aarch64-linux" = "sha256-uhT0zlyP5WegC6wcUKr+ftpuHeeqN5ZJlMZhSKKNUpo=";
-    "x86_64-darwin" = "sha256-5u5XMzcMDtif6bHxSxKwRQXHDKVgh48CiTTRWCU2qgw=";
-    "aarch64-darwin" = "sha256-QOTUMToFdc/g8yXNzjnvfkMKQ2qDx3skeTRPHry3ivQ=";
-    "x86_64-windows" = "sha256-aMRs9reIsqK6PbMTASQgKAcU1Mfa59olo+DA7IxYYWk=";
+    "x86_64-linux" = "sha256-CLsh1jJs50DZHM5+voimU2kz9uHjA1O5GgawHyXaMGw=";
+    "aarch64-linux" = "sha256-8tJ2AMNn5FBX1qFvalwqqNd7QamxDUvD2EnC+Ihw6UQ=";
+    "x86_64-darwin" = "sha256-spYtxEXYc99Wrn07p+ZlArBGu8Ta+oIOyhjQMDqYopw=";
+    "aarch64-darwin" = "sha256-FUkWCPawvE3r5erDXqtimisH6pofusaK1TvOpZ/MS0U=";
+    "x86_64-windows" = "sha256-91wWszuFI/4f9B59l+OuZUpH1ZoOMn3vJNstkpG7JL4=";
   };
 
-  platformNames = {
-    "x86_64-linux" = "opencode-linux-x64";
-    "aarch64-linux" = "opencode-linux-arm64";
-    "x86_64-darwin" = "opencode-darwin-x64";
-    "aarch64-darwin" = "opencode-darwin-arm64";
-    "x86_64-windows" = "opencode-windows-x64";
+  # OpenCode 2.x is published as GitHub release archives, not on npm
+  platformAssets = {
+    "x86_64-linux" = "opencode-linux-x64.tar.gz";
+    "aarch64-linux" = "opencode-linux-arm64.tar.gz";
+    "x86_64-darwin" = "opencode-darwin-x64.zip";
+    "aarch64-darwin" = "opencode-darwin-arm64.zip";
+    "x86_64-windows" = "opencode-windows-x64.zip";
   };
 
-  platformName = platformNames.${system} or (throw "Unsupported system: ${system}");
+  platformAsset = platformAssets.${system} or (throw "Unsupported system: ${system}");
   platformHash = platformHashes.${system} or (throw "Unsupported system: ${system}");
 in
 
 stdenv.mkDerivation rec {
   pname = "opencode";
-  version = "1.19.5";  # Update this to install a newer version
+  version = "2.2.6";  # Update this to install a newer version
 
   # Download platform-specific binary directly
   src = fetchurl {
-    url = "https://registry.npmjs.org/${platformName}/-/${platformName}-${version}.tgz";
+    url = "https://github.com/anomalyco/opencode/releases/download/v${version}/${platformAsset}";
     sha256 = platformHash;
   };
 
@@ -37,24 +38,28 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [ 
     cacert      # SSL certificates for npm/binary downloads
     bash        # For wrapper scripts
+    unzip       # Darwin and Windows release archives are zips
   ];
+
+  dontUnpack = true;
+  # Bun-compiled binaries carry an embedded payload that strip can corrupt
+  dontStrip = true;
   
   # No runtime dependencies needed - binary is self-contained
   # buildInputs = [];  # Empty - no runtime deps needed
   
   buildPhase = ''
-    # Extract the platform-specific binary tarball
-    tar -xzf $src
-    
-    # The binary is located at: package/bin/opencode (or opencode.exe on Windows)
-    # Verify the binary exists and is executable
+    # Each release archive holds a single binary named opencode
+    mkdir -p package/bin
+    case "$src" in
+      *.zip) unzip -q $src -d package/bin ;;
+      *) tar -xzf $src -C package/bin ;;
+    esac
+
     if [ ! -f package/bin/opencode ]; then
-      echo "Error: Expected binary not found in package/bin/opencode"
+      echo "Error: Expected binary not found in release archive"
       exit 1
     fi
-    
-    # Verify it's actually a binary and not a script
-    file package/bin/opencode
   '';
 
   installPhase = ''
