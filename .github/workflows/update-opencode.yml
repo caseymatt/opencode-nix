@@ -116,7 +116,17 @@ jobs:
         run: |
           # Update flake.lock
           nix flake update --extra-experimental-features 'nix-command flakes'
-        
+
+      # PRs opened with GITHUB_TOKEN don't trigger the PR test workflow, so check the build here before merging.
+      - name: Build and test the new version
+        if: steps.check.outputs.update_needed == 'true'
+        run: |
+          nix build .#opencode --print-build-logs
+          version_output=$(./result/bin/opencode --version)
+          echo "Version output: $version_output"
+          echo "$version_output" | grep -E "^(opencode )?v?${{ steps.check.outputs.latest }}$"
+          rm -f result
+
       - name: Create Pull Request
         if: steps.check.outputs.update_needed == 'true'
         id: create-pr
@@ -164,12 +174,13 @@ jobs:
             dependencies
             automated
       
-      - name: Enable Auto-Merge
+      # mainline has no branch protection, so GitHub's auto-merge isn't available; the build step above is the gate.
+      - name: Merge Pull Request
         if: steps.check.outputs.update_needed == 'true' && steps.create-pr.outputs.pull-request-number
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash --delete-branch
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --squash --delete-branch
 
       - name: Summary
         if: always()
