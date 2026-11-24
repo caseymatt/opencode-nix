@@ -4,11 +4,11 @@ let
   # Platform detection and corresponding hashes
   # These hashes are automatically updated by GitHub Actions
   platformHashes = {
-    "x86_64-linux" = "sha256-VjtdZjY3ImtuO7S7aAMoG8ObDSzYjbBtZ0tkIKqwCbA=";
-    "aarch64-linux" = "sha256-nRAYWs23IzbghuaZyjY6YGX0EP08HK7Q3IBG6VrAbMs=";
-    "x86_64-darwin" = "sha256-GHWm0RBnAvBMlGiDFWPAYb0AM3+JGhtKbNFRFV5qr1w=";
-    "aarch64-darwin" = "sha256-MataBqKe3H5JuJXzXCtk6/58fwQ3sPJYGwBu/Nef7ho=";
-    "x86_64-windows" = "sha256-itWfGZKgWU2L1yte074fW//82dF1aFPux+XTFBwlvh8=";
+    "x86_64-linux" = "sha256-nd0Y4/r2Tq7M9qD8vJalx6FFIK5f1bYeW+UdiU9Hi0c=";
+    "aarch64-linux" = "sha256-yyjPlFQa62KksupZl6mbXda65ZWncvNvvieSmfIDKk8=";
+    "x86_64-darwin" = "sha256-p6THWKMkiBOFMastgr6G4qFDjDXAF2ZPg9qh1bY7uCw=";
+    "aarch64-darwin" = "sha256-laEB7alRCEePHbQ8/4/L1IEfbA55rx4WcwGEPGpI1zE=";
+    "x86_64-windows" = "sha256-gx4AgGUx+rsYRTPvhf6tluuSKHyrLQ8h232qpJTnUIM=";
   };
 
   # OpenCode 2.x is published as GitHub release archives, not on npm
@@ -26,7 +26,7 @@ in
 
 stdenv.mkDerivation rec {
   pname = "opencode";
-  version = "2.3.2";  # Update this to install a newer version
+  version = "2.4.1";  # Update this to install a newer version
 
   # Download platform-specific binary directly
   src = fetchurl {
